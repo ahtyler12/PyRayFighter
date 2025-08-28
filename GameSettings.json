@@ -1,0 +1,10 @@
+{
+  "Video Settings": {
+    "screen_width": 800,
+    "screen_height": 600,
+    "screen_mode": 1
+  },
+  "Sound Settings": {
+    "master_volume": 1.0
+  }
+}
