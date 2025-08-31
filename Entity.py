@@ -16,8 +16,7 @@ class Entity:
     def update(self):
         self.position.x += self.velocity.x
         self.position.y += self.velocity.y
-    def is_on_floor(self)->bool:
-        return self.position.y == 0
+
 
     
     

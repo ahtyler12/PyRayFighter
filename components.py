@@ -1,2 +1,3 @@
 from InputComponent import InputComponent
 from ReactionComponent import ReactionComponent
+from MovementComponent import MovementComponent

@@ -2,10 +2,11 @@ from State import State
 from typing import List
 from State import State, Idle,Move
 from InputComponent import InputComponent
+import MovementComponent
 
 class StateMachine:
-    def __init__(self,_inputs: InputComponent):
-        self.states: List[State] = [Idle(_inputs), Move(_inputs)]
+    def __init__(self,_inputs: InputComponent, _movement: MovementComponent):
+        self.states: List[State] = [Idle(_inputs, _movement), Move(_inputs, _movement)]
         self.starting_state = self.states[0]
         if self.starting_state is not None:
             self.starting_state.enter()

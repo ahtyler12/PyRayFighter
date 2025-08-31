@@ -1,7 +1,7 @@
 from pyray import *
 from InputComponent import InputCommand, MotionNames
 from StateMachine import StateMachine, State
-from components import ReactionComponent, InputComponent
+from components import ReactionComponent, InputComponent, MovementComponent
 from State import STATUS
 from HitEvent import HitEvent
 from Entity import Entity
@@ -41,6 +41,7 @@ class MatchState(Enum):
 class GameState:
     def __init__(self):
         self.entities = [Entity(), Entity()] 
+        self.movement = [MovementComponent(), MovementComponent()]
         self.inputs = [InputCommand.NONE, InputCommand.NONE]
         self.frame_count: int = 0
 
@@ -56,14 +57,15 @@ class MatchManager:
         self.INPUT_HISTORY_SIZE = 3*60*60 # Enough inputs for 3 60 second rounds at 60fps
         self.input_history = [[InputCommand.NONE, InputCommand.NONE] for i in range(2)]
         self.inputs = [InputCommand.NONE, InputCommand.NONE]
-        self.state_machines = [StateMachine(self.input_components[0]), StateMachine(self.input_components[0])]
+        self.movement_components:List[MovementComponent] =  [MovementComponent(), MovementComponent()]
+        self.state_machines: List[StateMachine] = [StateMachine(self.input_components[0], self.movement_components[0]), StateMachine(self.input_components[0], self.movement_components[0])]
         self.reaction_components:List[ReactionComponent] = [ReactionComponent(), ReactionComponent()]
         self.hit_events: List[HitEvent] = []
         self.last_hit_event: HitEvent = None
         self.entities = [Entity(), Entity()]
-        self.entities[0].position = Vector3(-100,0,0)
+        self.movement_components[0].position = Vector3(-100,0,0)
         self.entities[0].facing_right = True
-        self.entities[1].position = Vector3(100,0,0)
+        self.movement_components[1].position = Vector3(100,0,0)
         self.entities[1].facing_right = False
         self.entities[1].is_player_1 = False
         self.camera = Camera3D()
@@ -75,8 +77,11 @@ class MatchManager:
         self.saved_state = GameState()
         self.match_state = MatchState.MATCH_ACTIVE
         self.health_bar_width = 250
+        self.save_state()
     
     def update(self):
+        if is_key_pressed(KeyboardKey.KEY_F1):
+            self.load_state()
         self.camera.target = Vector3(0,50,0)
         match self.match_state:
             case MatchState.PREMATCH:
@@ -91,7 +96,6 @@ class MatchManager:
                 for input in self.input_components:
                     input.current_input = input.get_local_input(0)
                     input.update_input_buffer()
-                self.input_components[0].was_motion_executed(MotionNames.QCB, 18, True)
                 self.update_physics()
                 self.update_collisions()
                 self.update_reactions()
@@ -108,15 +112,13 @@ class MatchManager:
                 pass
         self.game_state.frame_count += 1
 
-        for entity in self.entities:
-            entity.update()
         for sm in self.state_machines:
             sm.update()
 
     def draw(self):
         draw_text(str(self.game_state.frame_count), int(get_screen_width()/2),50,24,BLACK)
-        draw_text(str(self.state_machines[0].current_state.state_id), 10, 50, 12, RED)     
-        draw_text(str(self.state_machines[0].current_state.state_id), int(get_screen_width() - 10), 50, 12, BLUE)     
+        draw_text("Current x velocity: "+str(self.movement_components[0].velocity.x), 10, 30, 12, RED)     
+        draw_text("Current x velocity: "+str(self.movement_components[0].velocity.x), int(get_screen_width() - 10), 30, 12, BLUE)     
         match self.match_state:
             case MatchState.PREMATCH:
                 pass
@@ -154,11 +156,14 @@ class MatchManager:
     def save_state(self):
         self.saved_state.entities = self.game_state.entities
         self.saved_state.inputs = self.game_state.inputs
+        self.saved_state.movement = self.game_state.movement
         self.saved_state.frame_count = self.game_state.frame_count
     
     def load_state(self):
+        print("Loading State!!!")
         self.game_state.entities = self.saved_state.entities
         self.game_state.inputs = self.saved_state.inputs
+        self.game_state.movement = self.saved_state.movement
         self.game_state.frame_count = self.saved_state.frame_count
 
     def check_round_over(self):
@@ -253,8 +258,8 @@ class MatchManager:
         pushbox_b = BoundingBox(Vector3(self.entities[1].position.x - self.state_machines[1].current_state.push_box.min.x, self.entities[1].position.y - self.state_machines[1].current_state.push_box.min.y,1),
                                           Vector3(self.entities[1].position.x + self.state_machines[1].current_state.push_box.max.x,self.entities[1].position.y + self.state_machines[1].current_state.push_box.max.y,1))
         if check_collision_boxes(pushbox_a, pushbox_b):
-            for entity in self.entities:
-                entity.position.x -= 1 if entity.facing_right else -1
+            for move in self.movement_components:
+                move.velocity.x -= 1 if move.facing_right else -1
         
         pass #Need to figure out where to store the hitboxes for each player
         #Something like
@@ -273,32 +278,34 @@ class MatchManager:
         knockback_threshold: int = 10
         air_deceleration: int = 4
         for entity in  range(len(self.entities)):
-            other_entity_x: float = self.entities[entity + 1 if entity +1 < len(self.entities) else 0].position.x
-            facing_opponent: bool = (other_entity_x < self.entities[entity].position.x and not self.entities[entity].facing_right) or (other_entity_x > self.entities[entity].position.x and self.entities[entity].facing_right)
+            other_entity_x: float = self.movement_components[entity + 1 if entity +1 < len(self.entities) else 0].position.x
+            facing_opponent: bool = (other_entity_x < self.movement_components[entity].position.x and not self.movement_components[entity].facing_right) or (other_entity_x > self.movement_components[entity].position.x and self.movement_components[entity].facing_right)
             if self.reaction_components[entity].hit_stop <= 0:
                 if self.state_machines[entity].current_state.state_id == 110 or self.state_machines[entity].current_state.state_id == 111:
                     pass
                 if (self.reaction_components[entity].hit_stun > 0 or self.reaction_components[entity].guard_stun > 0) and self.reaction_components[entity].knock_back != 0:
                     if self.reaction_components[entity].is_launch:
-                        self.entities[entity].velocity.y = self.reaction_components[entity].launch_velocity
-                        if self.entities[entity].facing_right:
-                            self.entities[entity].velocity.x = -self.reaction_components[entity].air_knock_back
+                        self.movement_components[entity].velocity.y = self.reaction_components[entity].launch_velocity
+                        if self.movement_components[entity].facing_right:
+                            self.movement_components[entity].velocity.x = -self.reaction_components[entity].air_knock_back
                         else:
-                            self.entities[entity].velocity.x = self.reaction_components[entity].air_knock_back
+                            self.movement_components[entity].velocity.x = self.reaction_components[entity].air_knock_back
                     else:
-                        if self.entities[entity].facing_right:
-                            self.entities[entity].velocity.x = -self.reaction_components[entity].knock_back
+                        if self.movement_components[entity].facing_right:
+                            self.movement_components[entity].velocity.x = -self.reaction_components[entity].knock_back
                         else:
-                            self.entities[entity].velocity.x = self.reaction_components[entity].knock_back
+                            self.movement_components[entity].velocity.x = self.reaction_components[entity].knock_back
                     
                     if self.state_machines[entity].current_state.state_id == 107 or self.state_machines[entity].current_state.state_id == 108:
                         self.reaction_components[entity].knock_back -= knockback_decel
                         if abs(self.reaction_components[entity].knock_back) <= knockback_threshold:
                             self.reaction_components[entity].knock_back = 0
-                            self.entities[entity].velocity.x = 0
+                            self.movement_components[entity].velocity.x = 0
                     elif self.state_machines[entity].current_state.state_id == 118:
                         self.reaction_components[entity].air_knock_back -= knockback_decel
                         self.reaction_components[entity].launch_velocity = self.reaction_components[entity].launch_velocity - air_deceleration
+            self.movement_components[entity].update()
+            self.entities[entity].position = self.movement_components[entity].position
 
 
 class NetMatchManager(MatchManager):

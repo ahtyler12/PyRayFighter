@@ -3,6 +3,7 @@ import InputComponent
 from HitEvent import HitEvent
 import Hitbox
 from Entity import Entity
+import MovementComponent
 from typing import List
 from pyray import *
 
@@ -27,6 +28,9 @@ class INVULTYPE(Enum):
     THROW = 2
     FULL = 3
 
+class MoveFlag(Enum):
+    MOVE_RIGHT = 0
+    MOVE_LEFT = 1
 
 
 class State:
@@ -39,10 +43,11 @@ class State:
     parent: Entity = None
     hit_events: list[HitEvent]
     #_parent: Entity
-    def __init__(self, _input_component: InputComponent):
+    def __init__(self, _input_component: InputComponent, _movement_component: MovementComponent):
         self.input_component = _input_component
+        self.movement_component = _movement_component
         self.hurt_boxes: List[BoundingBox] = [] #Hurt boxes are stored as a List of Rectangles with an offset as the position. That way they are always at the entities location
-        self.push_box: BoundingBox = BoundingBox(Vector3(100,100,1), Vector3(100,100,1))
+        self.push_box: BoundingBox = BoundingBox(Vector3(50,100,1), Vector3(50,100,1))
         # self.parent = _parent if _parent is not None else None
     
     def update(self):
@@ -79,44 +84,49 @@ class State:
         pass
 
 class Idle(State):
-    def __init__(self, _input_component: InputComponent):
+    def __init__(self, _input_component: InputComponent, _movement_component: MovementComponent):
         self.state_id = 1
-        super().__init__(_input_component)
+        super().__init__(_input_component,_movement_component)
         
         self.hurt_boxes.insert(0,BoundingBox(Vector3(30, 0, 0),Vector3(40,40,40)))
 
     def update(self):
-        if self.input_component.is_input_held(InputComponent.InputCommand.Right, True):
-            print("Righyt pressed")
-            return 2
+        # if self.input_component.current_input & InputComponent.InputCommand.Right:
+        #     print("Pressed Right")
+        #     return 2
+        # elif self.input_component.is_input_held(InputComponent.InputCommand.Left,self.movement_component.facing_right):
+        #     print("Pressed Leftt")
+        #     return 2
         return None
     
     def enter(self):
         print("Entering Idle State")
+        self.movement_component.velocity.x = 0
     
     def exit(self):
         print("Exiting Idle State")
 
 class Move(State):
-    def __init__(self, _input_component: InputComponent):
+    def __init__(self, _input_component: InputComponent, _movement_component: MovementComponent):
         self.state_id = 2
-        super().__init__(_input_component)
+        super().__init__(_input_component,_movement_component)
         
         self.hurt_boxes.insert(0,BoundingBox(Vector3(30, 0, 0),Vector3(40,40,40)))
 
     def update(self):
-        if self.input_component.is_input_held(InputComponent.InputCommand.Right, True):
-            self.push_box.min.x += 2
-            self.push_box.max.x += 2
-        elif self.input_component.is_input_held(InputComponent.InputCommand.Left,True):
-            self.push_box.min.x -= 2
-            self.push_box.max.x -= 2
-        else:
-            return 1
+        pass
+        # if  not self.input_component.is_input_held(InputComponent.InputCommand.Right, self.movement_component.facing_right) or not self.input_component.is_input_held(InputComponent.InputCommand.Left,self.movement_component.facing_right):
+        #     return 1
 
     
     def enter(self):
         print("Entering Move State")
+        # if self.input_component.current_input & InputComponent.InputCommand.Right:
+        #      self.movement_component.velocity.x = 10 
+        # elif self.input_component.current_input & InputComponent.InputCommand.Left:
+        #      self.movement_component.velocity.x = -10 
+       
     
     def exit(self):
         print("Exiting Move State")
+        self.push_box = BoundingBox(Vector3(50,100,1), Vector3(50,100,1))
